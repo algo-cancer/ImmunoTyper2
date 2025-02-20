@@ -12,9 +12,9 @@
 
 ImmunoTyper-SR leverages the Gurobi solver for optimization. You need a valid license to use Gurobi. Licenses are [free for academic purposes](https://www.gurobi.com/downloads/end-user-license-agreement-academic/).
 
-### Docker / Singularity
+### Singularity / Docker
 
-For the easiest installation, we recommend using the Docker image available on DockerHub at `cdslsahinalp/immunotyper-sr`.
+For the easiest installation, we recommend using Singularity by pulling the Docker image available on DockerHub at `cdslsahinalp/immunotyper-sr`.
 
 To run the image with Singularity (commonly used on HPCs), use the following command:
 
@@ -23,6 +23,13 @@ singularity pull docker://cdslsahinalp/immunotyper-sr
 singularity run -B <GUROBI_LICENSE_PATH>:/opt/gurobi/gurobi.lic -B <BAM_DIRECTORY>:<BAM_DIRECTORY> -B <OUTPUT_PATH>:/output immunotyper-sr_latest.sif <OPTIONAL ARGUMENTS> <BAM_DIRECTORY>/<BAM_FILE> 
 ```
 You can find your gurobi license file path with `echo $GRB_LICENSE_FILE`.
+
+You can also run the image with Docker, however **this method has not been tested**:
+
+```sh
+docker pull cdslsahinalp/immunotyper-sr
+docker run -v <GUROBI_LICENSE_PATH>:/opt/gurobi/gurobi.lic -v <BAM_DIRECTORY>:<BAM_DIRECTORY> -v <OUTPUT_PATH>:/output immunotyper-sr <OPTIONAL ARGUMENTS> <BAM_DIRECTORY>/<BAM_FILE> 
+```
 
 ### Conda + Pip
 
