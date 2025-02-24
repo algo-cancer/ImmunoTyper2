@@ -14,7 +14,7 @@ ImmunoTyper-SR leverages the Gurobi solver for optimization. You need a valid li
 
 ### Singularity / Docker
 
-For the easiest installation, we recommend using Singularity by pulling the Docker image available on DockerHub at `cdslsahinalp/immunotyper-sr`.
+For the easiest installation, **we recommend using Singularity** by pulling the Docker image available on DockerHub at `cdslsahinalp/immunotyper-sr`.
 
 To run the image with Singularity (commonly used on HPCs), use the following command:
 
