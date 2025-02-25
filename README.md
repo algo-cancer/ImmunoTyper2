@@ -27,6 +27,13 @@ docker pull cdslsahinalp/immunotyper-sr
 docker run -v <BAM_DIRECTORY>:<BAM_DIRECTORY> -v <OUTPUT_PATH>:/output immunotyper-sr <OPTIONAL ARGUMENTS> <BAM_DIRECTORY>/<BAM_FILE> 
 ```
 
+You can also run the image with Docker, however **this method has not been tested**:
+
+```sh
+docker pull cdslsahinalp/immunotyper-sr
+docker run -v <GUROBI_LICENSE_PATH>:/opt/gurobi/gurobi.lic -v <BAM_DIRECTORY>:<BAM_DIRECTORY> -v <OUTPUT_PATH>:/output immunotyper-sr <OPTIONAL ARGUMENTS> <BAM_DIRECTORY>/<BAM_FILE> 
+```
+
 ### Conda + Pip
 
 If you already have BWA installed and prefer not to create a new environment, you can download the latest release binary (see right toolbar) and install it with pip:
