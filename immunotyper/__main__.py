@@ -7,13 +7,13 @@ from Bio import SeqIO
 from statistics import mean
 from .read_filter_classes import BowtieFlankingFilter
 from .candidate_builder_classes import BwaMappingsCandidateBuilder
-from .solvers import GurobiSolver
+from .solvers import GurobiSolver, OrToolsSolver
 from .models import ShortReadModelTotalErrorDiscardObj
 from .common import resource_path
 from .post_processing import PostProcessorModel
 
 
-implemented_solvers = {'gurobi': GurobiSolver}
+implemented_solvers = {'gurobi': GurobiSolver, 'or-tools': OrToolsSolver}
 
 implemented_models = {'ilp': ShortReadModelTotalErrorDiscardObj}
 
@@ -21,7 +21,10 @@ implemented_models = {'ilp': ShortReadModelTotalErrorDiscardObj}
 parser = argparse.ArgumentParser(description='ImmunoTyper-SR: Ig Genotyping using Short Read WGS')
 
 parser.add_argument('bam_path', type=str, help='Input BAM file')
-parser.add_argument('--gene_type', choices=['ighv', 'iglv', 'trav', 'igkv', 'trbv', 'trdv', 'trgv'], default='ighv', help='Specify which genes to target')
+parser.add_argument('--gene_type', choices=['ighv', 'iglv', 'trav', 'igkv', 'trbv', 'trdv', 'trgv'], 
+                    default='ighv', 
+                    help='Specify which genes to target', 
+                    type=lambda s: s.lower())  # convert to lowercase
 parser.add_argument('--output_dir', default='', type=str, help='Path to output directory. Outputs txt file of allele calls with prefix matching input BAM file name.')
 
 
@@ -37,8 +40,8 @@ parser.add_argument('--hg37',
 
 parser.add_argument('--solver',
     help='Choose ilp solver',
-    choices=['gurobi'], 
-    default='gurobi'
+    choices=['gurobi', 'or-tools'], 
+    default='or-tools'
 )
 
 # parser.add_argument('--model',
@@ -221,7 +224,7 @@ def run_immunotyper(bam_path: str,  ref: str='',
                             sequencing_error_rate=seq_error_rate)
 
     model.build(positive, candidates)
-    model.solve(time_limit=solver_time_limit*3600, threads=threads, log_path=os.path.join(output_dir, f'{output_prefix}-{gene_type}-gurobi.log'))
+    model.solve(time_limit=solver_time_limit*3600, threads=threads, log_path=os.path.join(output_dir, f'{output_prefix}-{gene_type}-{solver}.log'))
 
 
     # Write outputs

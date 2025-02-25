@@ -1,28 +1,31 @@
-# 🎉 ImmunoTyper-SR 🧬
+# 🎉 ImmunoTyper2 🧬
 
-**ImmunoTyper-SR** is a powerful tool for Immunoglobulin Variable Gene genotyping and CNV analysis from whole genome sequencing (WGS) short reads using ILP Optimization. Check out our [paper here](https://www.cell.com/cell-systems/fulltext/S2405-4712(22)00352-0?_returnURL=https%3A%2F%2Flinkinghub.elsevier.com%2Fretrieve%2Fpii%2FS2405471222003520%3Fshowall%3Dtrue) for more details.
+**ImmunoTyper2** is a powerful tool for Immunoglobulin Variable Gene genotyping and CNV analysis from whole genome sequencing (WGS) short reads using ILP Optimization. Check out our [paper here](https://www.cell.com/cell-systems/fulltext/S2405-4712(22)00352-0?_returnURL=https%3A%2F%2Flinkinghub.elsevier.com%2Fretrieve%2Fpii%2FS2405471222003520%3Fshowall%3Dtrue) for more details.
 
 📢 **New Feature:** 
-- Now supporting V gene calling for **all IG and TR loci!** (IGH, IGL, IGK, TRA, TRB, TRG, TRD) 🎉
+- Default ILP solver is now the free-to-use [Google OR Tools](https://developers.google.com/optimization) with the CP SAT solver! 🎉
+- Now supporting V gene calling for **all IG and TR loci!** (IGH, IGL, IGK, TRA, TRB, TRG, TRD) 
 - **Novel Variant Calling**: Identify novel variants for all gene calls using FreeBayes and WhatsHap. Variants are listed in `<prefix>-<gene_type>-novel-variants.txt` and phased VCFs are available in `<prefix>-<gene_type>-novel_variant_vcfs/<gene_id>_variants.vcf`.
 
 ## 🚀 Installation
 
-### Gurobi
-
-ImmunoTyper-SR leverages the Gurobi solver for optimization. You need a valid license to use Gurobi. Licenses are [free for academic purposes](https://www.gurobi.com/downloads/end-user-license-agreement-academic/).
-
 ### Singularity / Docker
 
-For the easiest installation, we recommend using Singularity by pulling the Docker image available on DockerHub at `cdslsahinalp/immunotyper-sr`.
+For the easiest installation, **we recommend using Singularity** by pulling the Docker image available on DockerHub at `cdslsahinalp/immunotyper-sr`.
 
 To run the image with Singularity (commonly used on HPCs), use the following command:
 
 ```sh
 singularity pull docker://cdslsahinalp/immunotyper-sr
-singularity run -B <GUROBI_LICENSE_PATH>:/opt/gurobi/gurobi.lic -B <BAM_DIRECTORY>:<BAM_DIRECTORY> -B <OUTPUT_PATH>:/output immunotyper-sr_latest.sif <OPTIONAL ARGUMENTS> <BAM_DIRECTORY>/<BAM_FILE> 
+singularity run -B <BAM_DIRECTORY>:<BAM_DIRECTORY> -B <OUTPUT_PATH>:/output immunotyper-sr_latest.sif <OPTIONAL ARGUMENTS> <BAM_DIRECTORY>/<BAM_FILE> 
 ```
-You can find your gurobi license file path with `echo $GRB_LICENSE_FILE`.
+
+You can also run the image with Docker, however **this method has not been tested**:
+
+```sh
+docker pull cdslsahinalp/immunotyper-sr
+docker run -v <BAM_DIRECTORY>:<BAM_DIRECTORY> -v <OUTPUT_PATH>:/output immunotyper-sr <OPTIONAL ARGUMENTS> <BAM_DIRECTORY>/<BAM_FILE> 
+```
 
 You can also run the image with Docker, however **this method has not been tested**:
 
@@ -58,6 +61,8 @@ Installing ImmunoTyper-SR with pip will automatically install these dependencies
 - [gurobipy](https://www.gurobi.com/documentation/9.5/quickstart_mac/cs_grbpy_the_gurobi_python.html)
 - [logbook](https://logbook.readthedocs.io/en/stable/)
 - [pysam](https://pysam.readthedocs.io/en/latest/api.html)
+- [ortools](https://developers.google.com/optimization)
+- [wurlitzer](https://pypi.org/project/wurlitzer/)
 
 In addition to the above, you will need 
 
@@ -122,7 +127,7 @@ optional arguments:
                         Path to output directory. Outputs txt file of allele calls with prefix matching input BAM file name.
   --ref REF             Path to the reference FASTA to decode CRAM files. Option is not used if bam_path is not a CRAM.
   --hg37                Flag if BAM mapped to GRCh37 not GRCh38
-  --solver {gurobi}     Choose ilp solver
+  --solver {or-tools, gurobi}     Choose ilp solver
   --bwa BWA             path to bwa executible if not in $PATH
   --max_copy MAX_COPY   Maximum number of allele copies to call
   --landmarks_per_group LANDMARKS_PER_GROUP
