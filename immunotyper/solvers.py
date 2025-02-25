@@ -1,6 +1,9 @@
-import importlib
+import importlib, sys
 from abc import ABCMeta, abstractmethod
 from typing import Literal
+from wurlitzer import pipes
+from .common import log
+
 
 class NoSolutionsError(Exception):
     """Raised if a model is infeasible."""
@@ -23,7 +26,7 @@ class SolverMeta(metaclass=ABCMeta):
 
 class IlpSolverMeta(SolverMeta):
     """Meta class for ILP solvers. Child classes must implement all abstract classes"""
-    SOLUTION_PRECISION = 1e-5
+    SOLUTION_PRECISION = 1e-7
     VALID_VARIABLE_TYPES = set(['b', 'c', 'i'])
     
 
@@ -226,3 +229,100 @@ class GurobiSolver(IlpSolverMeta):
     def changeUb(self, var, ub):
         var.ub = ub
         self.model.update()
+
+
+class OrToolsSolver(IlpSolverMeta):
+    '''Wrapper for Google OR tools CBC solver'''
+
+    def __init__(self, name: str) -> None:
+        sys.argv.extend(["--logtostderr", "--stderrthreshold=INFO", "--v=1"])
+        self.ortools = importlib.import_module("ortools.linear_solver.pywraplp")
+        self.model = self.ortools.Solver.CreateSolver("CP_SAT")
+        self.model.EnableOutput()
+
+        self.INF = self.model.infinity() #TODO
+        self.STATUS = {
+                self.ortools.Solver.INFEASIBLE: "INFEASIBLE",
+                self.ortools.Solver.FEASIBLE: "FEASIBLE",
+                self.ortools.Solver.UNBOUNDED: "UNBOUNDED",
+                self.ortools.Solver.OPTIMAL: "OPTIMAL",
+                self.ortools.Solver.NOT_SOLVED: "NOT_SOLVED",
+                self.ortools.Solver.ABNORMAL: "ABNORMAL",
+            }
+        self.names = {}
+    
+    
+    def add_constr(self, *args, name, **kwargs):
+        kwargs['name'] = name
+        return self.model.Add(*args, **kwargs)
+
+    def _add_var(self, name: str, type: str, lb: int=0, ub=None, *args, **kwargs):    
+        if type == "b":
+            v = self.model.BoolVar(name)
+        elif type == "i":
+            v = self.model.IntVar(lb, ub, name)
+        else:
+            v = self.model.NumVar(lb, ub, name)
+        return v
+
+    def quicksum(self, expr):
+        return self.model.Sum(expr)
+
+    def setObjective(self, objective, method: str='min'):
+        self.objective = objective
+        if method == "min":
+            self.model.Minimize(self.objective)
+        else:
+            self.model.Maximize(self.objective)
+
+    def LinExpr(self, *args, **kwargs):
+        return self.ortools.LinearExpr(*args, **kwargs)
+
+    @staticmethod
+    def var_name(var):
+        return var.var_name
+    
+    def solve(self, time_limit: int,
+               threads: int, 
+               log_path: str,
+               method: Literal['minimize', 'maximize'] = 'minimize') -> None:
+        
+        if method == 'minimize':
+            self.model.Minimize(self.objective)
+        elif method == 'maximize':
+            self.model.Minimize(self.objective)
+        else:
+            raise ValueError(f"Invalid method argument {method}")
+        
+        with pipes() as (out, err):
+            status_type = self.model.Solve() #TODO time limit, threads
+            status = self.STATUS[status_type]
+            if status == 'INFEASIBLE':
+                raise NoSolutionsError(status)
+            if not self.model.VerifySolution(self.SOLUTION_PRECISION, True):
+                raise NoSolutionsError(status)
+        std_out = out.read()
+        std_err = err.read()
+        with open(log_path, 'w') as f:
+            f.write(std_out)
+            f.write(std_err)
+        log.debug(f"Captured OR-Tools stdout: {out.read()}")
+        log.debug(f"Captured OR-Tools stderr: {err.read()}")
+
+        log.debug(f"OR-Tools status: {status}")
+
+        return status, self.model.Objective().Value()
+
+    def get_value(self, var):
+        x = var.solution_value()
+        if hasattr(var, "integer") and var.integer():
+            x = int(round(x))
+            if (
+                abs(var.lb()) < self.SOLUTION_PRECISION
+                and abs(1 - var.ub()) < self.SOLUTION_PRECISION
+            ):
+                return x > 0
+            else:
+                return x
+        else:
+            return x

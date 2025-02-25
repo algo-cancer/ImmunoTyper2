@@ -397,7 +397,7 @@ class PostProcessorModel(PostProcessor):
 
         read_assignment = {}
         for r in model.reads:
-            assigned = [allele_id for allele_id, d_var in r.assignment.items() if d_var.X > 0.5]
+            assigned = [allele_id for allele_id, d_var in r.assignment.items() if model.get_value(d_var) > 0.5]
             if len(assigned) > 1:
                 raise ValueError(f'Read {r.id} assigned to > 1 allele: {str(assigned)}')
             r.assigned = assigned[0] if assigned else None
