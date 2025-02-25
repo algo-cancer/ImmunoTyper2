@@ -232,7 +232,7 @@ class GurobiSolver(IlpSolverMeta):
 
 
 class OrToolsSolver(IlpSolverMeta):
-    '''Wrapper for Google OR tools CBC solver'''
+    '''Wrapper for Google OR tools CP_SAT'''
 
     def __init__(self, name: str) -> None:
         sys.argv.extend(["--logtostderr", "--stderrthreshold=INFO", "--v=1"])
