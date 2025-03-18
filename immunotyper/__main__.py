@@ -129,6 +129,14 @@ parser.add_argument(
     help='Save the extracted reads FASTA file instead of deleting it after use'
 )
 
+parser.add_argument(
+    '--solution_precision',
+    type=int,
+    default=7,
+    help='Optimality gap parameter for the solver, interger value: 1e-{solution_precision}'
+)
+
+
 def main():
     args = parser.parse_args()    
     run_immunotyper(args.bam_path, args.ref, args.gene_type, args.hg37, args.solver, args.output_dir, args.landmark_groups, args.landmarks_per_group, args.max_copy, args.stdev_coeff, args.seq_error_rate, args.write_cache_path, args.solver_time_limit, args.threads, args.save_extracted_reads)
@@ -147,7 +155,8 @@ def run_immunotyper(bam_path: str,  ref: str='',
                                     write_cache_path: str='',
                                     solver_time_limit: int=1,
                                     threads: int=6,
-                                    save_extracted_reads: bool=False):
+                                    save_extracted_reads: bool=False,
+                                    solution_precision: int=None):
     """Driver method to run immunotyper and output calls
 
     Args:
@@ -225,6 +234,8 @@ def run_immunotyper(bam_path: str,  ref: str='',
                             sequencing_error_rate=seq_error_rate)
 
     model.build(positive, candidates)
+    if solution_precision:
+        model.SOLUTION_PRECISION = solution_precision
     model.solve(time_limit=solver_time_limit*3600, threads=threads, log_path=os.path.join(output_dir, f'{output_prefix}-{gene_type}-{solver}.log'))
 
 
