@@ -21,8 +21,10 @@ class MappingFilter(Filter):
     write_cache_path = None
     load_cache_path = None
 
-    def __init__(self, mapper, mapping_params=None, reference_path=None, write_cache_path=None, load_cache_path=None):
+    def __init__(self, mapper, mapping_params=None, reference_path=None, write_cache_path=None, load_cache_path=None, threads=0):
         self.mapper = mapper
+        if threads:
+            self.mapper.threads = threads
         self.mapping_params = mapping_params
         self.reference_path = reference_path
         self.write_cache_path = write_cache_path
@@ -253,11 +255,11 @@ class FlankingFilter(MappingFilter):
         return self.get_reference_length(mapping)
     
 class BwaFlankingFilter(FlankingFilter):
-    def __init__(self, mapping_params=None, reference_path=None, write_cache_path=None, load_cache_path=None, minimum_coding_bases=50):
+    def __init__(self, mapping_params=None, reference_path=None, write_cache_path=None, load_cache_path=None, minimum_coding_bases=50, threads=0):
         super(BwaFlankingFilter, self).__init__(BwaWrapper(params='-a', output_path=write_cache_path), mapping_params, reference_path, write_cache_path, load_cache_path, minimum_coding_bases)
 
 class BowtieFlankingFilter(FlankingFilter):
-    def __init__(self, mapping_params=None, reference_path=None, write_cache_path=None, load_cache_path=None, minimum_coding_bases=50):
+    def __init__(self, mapping_params=None, reference_path=None, write_cache_path=None, load_cache_path=None, minimum_coding_bases=50, threads=0):
         super(BowtieFlankingFilter, self).__init__(BowtieWrapper(params='-a --end-to-end --very-sensitive  --n-ceil C,100,0 --np 0 --ignore-quals --mp 2,2 --score-min C,-50,0 -L 10', output_path=write_cache_path), mapping_params, reference_path, write_cache_path, load_cache_path, minimum_coding_bases)
 
 

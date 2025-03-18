@@ -16,11 +16,12 @@ class MappingWrapper():
     src = '' 	## path / command to access executabke
     output_path =  None
 
-    def __init__(self, src=None, params=None, output_path=None, output_sorted_bam=False):
+    def __init__(self, src=None, params=None, output_path=None, output_sorted_bam=False, threads=0):
         self.params = params
         if src: self.src = src
         if output_path: self.output_path = output_path
         self.output_sorted_bam = output_sorted_bam
+        self.threads = threads
 
     # def __str__(self):
     #     return(self.src + self.params)
@@ -118,9 +119,9 @@ class BwaWrapper(MappingWrapper):
     src = 'bwa'
     def build_command(self, src, params, query_path, target_path, output_path):
         if not self.output_sorted_bam:
-            return ' '.join([src, 'mem', params, target_path, query_path, '>', output_path])
+            return ' '.join([src, 'mem', params, '-t',  str(self.threads if self.threads > 0 else 1), target_path, query_path, '>', output_path])
         else:
-            return ' '.join([src, 'mem', params, target_path, query_path, '|', 'samtools', 'view', '-b', '|', 'samtools', 'sort', '-', '>', output_path])
+            return ' '.join([src, 'mem', params, '-t',  str(self.threads if self.threads > 0 else 1), target_path, query_path, '|', 'samtools', 'view', '-b', '|', 'samtools', 'sort', '-@', str(self.threads), '-', '>', output_path])
 
     def index_reference(self, reference_path):
         run_command(f"bwa index {reference_path}", quiet=True)
@@ -131,9 +132,9 @@ class BowtieWrapper(MappingWrapper):
         if os.path.splitext(query_path)[1].replace('"', '') in set(['.fa', '.FA', '.fasta']): # input is fasta file
             params = params+' -f'
         if not self.output_sorted_bam:
-            return ' '.join([src, params, '-x', target_path, '-U', query_path, '-S', output_path])
+            return ' '.join([src, params, '-p', str(self.threads if self.threads > 0 else 1), '-x', target_path, '-U', query_path, '-S', output_path])
         else:
-            return ' '.join([src, params, '-x', target_path, '-U', query_path, '|', 'samtools', 'view', '-b', '|', 'samtools', 'sort', '-', '>', output_path])
+            return ' '.join([src, params, '-p', str(self.threads if self.threads > 0 else 1), '-x', target_path, '-U', query_path, '|', 'samtools', 'view', '-b', '|', 'samtools', 'sort', '-@', str(self.threads), '-', '>', output_path])
     def index_reference(self, reference_path):
         run_command(f"bowtie2-build {reference_path} {reference_path}", quiet=True)
 
