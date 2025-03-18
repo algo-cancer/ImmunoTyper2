@@ -380,7 +380,7 @@ class PostProcessor(object):
 class PostProcessorModel(PostProcessor):
     '''Child of PostProcessor using lpinterface.ShortReadModelTotalErrorDiscardObj as input to get required data'''
 
-    def __init__(self, model, allele_db, sequencing_depth: int=None, *args, **kwargs) -> None:
+    def __init__(self, model, allele_db, sequencing_depth: int=None, threads=0, *args, **kwargs) -> None:
         '''
         Args
             sequencing_depth            Single copy sampled sequencing depth'''
@@ -389,6 +389,8 @@ class PostProcessorModel(PostProcessor):
         kwargs['allele_db'] = allele_db
         kwargs['sequencing_depth'] = sequencing_depth
         super().__init__(*args, **kwargs)
+        if threads:
+            self.mapper.threads = threads
 
 
     def get_attributes_from_model(self, model):

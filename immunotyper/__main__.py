@@ -95,7 +95,7 @@ parser.add_argument(
 parser.add_argument(
     '--solver_time_limit',
     type=float,
-    default=1,
+    default=5,
     help='Time limit for ILP solver in hours'
 )
 
@@ -174,7 +174,7 @@ def run_immunotyper(bam_path: str,  ref: str='',
 
     # Extract reads from BAM
     log.info("Extracting reads from BAM file")
-    bam_filter = BamFilterImplemented(bam_path, gene_type, not hg37, reference_fasta_path=ref, output_path=output_dir)
+    bam_filter = BamFilterImplemented(bam_path, gene_type, not hg37, reference_fasta_path=ref, output_path=output_dir, threads=threads)
     reads = bam_filter.recruit_reads()
     m, variance, edge_variance = bam_filter.sample_coverage(large_depth_sample=True)
     READ_DEPTH = int(round(m/2))
@@ -198,7 +198,8 @@ def run_immunotyper(bam_path: str,  ref: str='',
     log.info("Filtering reads and mapping to allele database")
     flanking_filter = BowtieFlankingFilter(reference_path=get_allele_db_mapping_path(gene_type),
                                     write_cache_path = write_cache_path if write_cache_path else None,
-                                    load_cache_path = write_cache_path if write_cache_path else None)
+                                    load_cache_path = write_cache_path if write_cache_path else None,
+                                    threads=threads)
                                    
     positive, negative = flanking_filter.filter_reads(bam_filter.output_path, mapping_params="-a --end-to-end --very-sensitive --n-ceil C,100,0 --np 0 --ignore-quals --mp 2,2 --score-min C,-50,0 -L 10")
     log.info(f"Found {len(positive)} candidate {gene_type.upper()} reads for analysis")

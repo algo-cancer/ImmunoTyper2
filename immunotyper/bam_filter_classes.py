@@ -20,7 +20,7 @@ class BamFilter(ABC):
     large_sample_chrom = 'chr1'
 
 
-    def __init__(self, bam_file_path, reference_fasta_path=None, file_type=None, primary_mapping_only=False, output_path=None):
+    def __init__(self, bam_file_path, reference_fasta_path=None, file_type=None, primary_mapping_only=False, output_path=None, threads=0):
         '''
         Args:
             bam_file_path (str):                path to bam file
@@ -37,6 +37,7 @@ class BamFilter(ABC):
         else:
             self.output_path = output_path
         self.reference_fasta_path = reference_fasta_path
+        self.threads = threads
 
         # check input bam_file_path
         try:
@@ -115,7 +116,7 @@ class BamFilter(ABC):
                 p1 = sp.Popen(command, stdout=sp.PIPE)
             log.debug(' '.join(command) + ' |')
             
-            command = ['samtools', 'fasta', '-']
+            command = ['samtools', 'fasta', '-@', str(self.threads), '-']
             log.debug(' '.join(command) + ' |')
             p2 = sp.Popen(command, stdin=p1.stdout, stdout=sp.PIPE)
             p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
@@ -139,9 +140,9 @@ class BamFilter(ABC):
                 if self.file_type == 'rc':
                     _env = {'REF_PATH': self.reference_fasta_path}
                     # p1 = sp.Popen(['samtools', 'view', '-h', f'{self.bam_file_path}', *(regions_str.split())], env=dict(os.environ, **_env), stdout=sp.PIPE)
-                    p1 = sp.Popen(['samtools', 'fasta', '-f', r'0x4', '--reference', f'{self.reference_fasta_path}', f'{self.bam_file_path}'], stdout=sp.PIPE)
+                    p1 = sp.Popen(['samtools', 'fasta', '-@', str(self.threads), '-f', r'0x4', '--reference', f'{self.reference_fasta_path}', f'{self.bam_file_path}'], stdout=sp.PIPE)
                 else:
-                    p1 = sp.Popen(['samtools', 'fasta', '-f', r'0x4', f'{self.bam_file_path}'], stdout=sp.PIPE)
+                    p1 = sp.Popen(['samtools', 'fasta', '-@', str(self.threads), '-f', r'0x4', f'{self.bam_file_path}'], stdout=sp.PIPE)
                 p2 = sp.Popen(['sed', '-E', r"s;/(.);-\1-un;"], stdin=p1.stdout, stdout=f_out)
                 p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
                 p2.communicate()
@@ -270,7 +271,7 @@ class BamFilter(ABC):
         chromosome = self.find_chrom_id(self.large_sample_chrom)
 
         # Command to execute samtools depth
-        command = f"samtools depth -r {chromosome} {bam_file}"
+        command = f"samtools depth -@ {self.threads} -r {chromosome} {bam_file}"
 
         # Run the command and capture the output
         process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -326,7 +327,7 @@ regions_resource_path = lambda x: resource_path(x, 'immunotyper.data.extract_reg
 class BamFilterImplemented(BamFilter):
     '''Simple wrapper for BamFilter that just requires the gene type and reference genome specified at instantiation. Uses immunotyper package resources (immunotyper.data)'''
 
-    def __init__(self, bam_file_path, gene_type, hg38=True, reference_fasta_path=None, file_type=None, primary_mapping_only=False, output_path=None):
+    def __init__(self, bam_file_path, gene_type, hg38=True, reference_fasta_path=None, file_type=None, primary_mapping_only=False, output_path=None, threads=0):
         self.alternative_chromosome_ids_path = resource_path('hg38_chromosome_alt_ids.tsv') if hg38 else resource_path('hg37_chromosome_alt_ids.tsv')
         self.hg38 = hg38 
         self.gene_type = gene_type.lower()
@@ -334,7 +335,7 @@ class BamFilterImplemented(BamFilter):
         self.regions_path = regions_resource_path(f"{gene_type.upper()}-{'hg38' if hg38 else 'hg37'}_extract_regions.bed")
         log.debug(f"Using regions file: {self.regions_path}")
         
-        super().__init__(bam_file_path, reference_fasta_path, file_type, primary_mapping_only, output_path)
+        super().__init__(bam_file_path, reference_fasta_path, file_type, primary_mapping_only, output_path, threads)
     
     @property
     def regions_to_extract(self):

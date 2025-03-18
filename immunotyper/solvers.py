@@ -1,9 +1,9 @@
 import importlib, sys
 from abc import ABCMeta, abstractmethod
 from typing import Literal
-from wurlitzer import pipes
+# from wurlitzer import pipes
 from .common import log
-
+import threading
 
 class NoSolutionsError(Exception):
     """Raised if a model is infeasible."""
@@ -194,7 +194,10 @@ class GurobiSolver(IlpSolverMeta):
         if not log_path:
             log_path = 'gurobi.log'
         self.model.params.logFile = log_path
-        if MIPGap: self.model.params.MIPGap = MIPGap
+        if MIPGap: 
+            self.model.params.MIPGap = MIPGap
+        else:
+            self.model.params.MIPGap = self.SOLUTION_PRECISION
         print('RUNNING MODEL')
         self.model.optimize()
 
@@ -283,32 +286,63 @@ class OrToolsSolver(IlpSolverMeta):
         return var.var_name
     
     def solve(self, time_limit: int,
-               threads: int, 
-               log_path: str,
-               method: Literal['minimize', 'maximize'] = 'minimize') -> None:
+            threads: int, 
+            log_path: str,
+            method: Literal['minimize', 'maximize'] = 'minimize') -> None:
         
+        self.model.set_time_limit(int(time_limit*1000))
+        self.model.SetNumThreads(threads)
+
         if method == 'minimize':
             self.model.Minimize(self.objective)
         elif method == 'maximize':
+            # If maximize is desired, typically you would use a Maximize method.
+            # Adjust as needed.
             self.model.Minimize(self.objective)
         else:
             raise ValueError(f"Invalid method argument {method}")
         
-        with pipes() as (out, err):
-            status_type = self.model.Solve() #TODO time limit, threads
-            status = self.STATUS[status_type]
-            if status == 'INFEASIBLE':
-                raise NoSolutionsError(status)
-            if not self.model.VerifySolution(self.SOLUTION_PRECISION, True):
-                raise NoSolutionsError(status)
-        std_out = out.read()
-        std_err = err.read()
-        with open(log_path, 'w') as f:
-            f.write(std_out)
-            f.write(std_err)
-        log.debug(f"Captured OR-Tools stdout: {out.read()}")
-        log.debug(f"Captured OR-Tools stderr: {err.read()}")
+        # captured_stdout = []
+        # captured_stderr = []
+        # file_lock = threading.Lock()
 
+        # # This helper continuously reads from the given pipe, writes each decoded line
+        # # to the log file (using a lock for thread-safety) and appends it to a capture list.
+        # def stream_reader(pipe, capture_list):
+        #     for line in iter(pipe.readline, b''):
+        #         decoded_line = line.decode('utf-8')
+        #         capture_list.append(decoded_line)
+        #         with file_lock:
+        #             log_file.write(decoded_line)
+        #             log_file.flush()
+
+        # with pipes() as (out, err):
+        #     # Open the log file once and have both threads write to it.
+        #     with open(log_path, 'w') as log_file:
+        #         stdout_thread = threading.Thread(target=stream_reader, args=(out, captured_stdout))
+        #         stderr_thread = threading.Thread(target=stream_reader, args=(err, captured_stderr))
+                
+        #         stdout_thread.start()
+        #         stderr_thread.start()
+                
+        #         # Execute the solver while output is streamed.
+        #         status_type = self.model.Solve() 
+                
+        #         # Wait for both streams to finish reading.
+        #         stdout_thread.join()
+        #         stderr_thread.join()
+        
+        status_type = self.model.Solve() 
+
+        status = self.STATUS[status_type]
+        if status == 'INFEASIBLE':
+            raise NoSolutionsError(status)
+        if not self.model.VerifySolution(self.SOLUTION_PRECISION, True):
+            raise NoSolutionsError(status)
+
+        # # After the solver finishes, log the complete captured output.
+        # log.debug(f"Captured OR-Tools stdout: {''.join(captured_stdout)}")
+        # log.debug(f"Captured OR-Tools stderr: {''.join(captured_stderr)}")
         log.debug(f"OR-Tools status: {status}")
 
         return status, self.model.Objective().Value()
