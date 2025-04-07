@@ -190,6 +190,8 @@ def run_immunotyper(bam_path: str,  ref: str='',
                                     no_vcf: bool=False,
                                     no_read_assignment: bool=False,
                                     multi_band_solutions: bool=False):
+                                    solution_precision: int=None):
+        
     """Driver method to run immunotyper and output calls
 
     Args:
@@ -269,6 +271,7 @@ def run_immunotyper(bam_path: str,  ref: str='',
     model.build(positive, candidates)
     if solution_precision:
         model.SOLUTION_PRECISION = float(f"1e-{solution_precision}")
+
     model.solve(time_limit=solver_time_limit*3600, threads=threads, log_path=os.path.join(output_dir, f'{output_prefix}-{gene_type}-{solver}.log'))
 
 
