@@ -1,4 +1,4 @@
-import argparse, os
+import argparse, os, sys
 from posixpath import splitext
 from .common import log, initialize_logger, get_database_config, get_allele_db_mapping_path
 from .allele_database import ImgtNovelAlleleDatabase
@@ -11,6 +11,7 @@ from .solvers import GurobiSolver, OrToolsSolver
 from .models import ShortReadModelTotalErrorDiscardObj
 from .common import resource_path
 from .post_processing import PostProcessorModel
+from .multi_solution_analysis import MultiSolutionAnalysis
 
 
 implemented_solvers = {'gurobi': GurobiSolver, 'or-tools': OrToolsSolver}
@@ -41,7 +42,7 @@ parser.add_argument('--hg37',
 parser.add_argument('--solver',
     help='Choose ilp solver',
     choices=['gurobi', 'or-tools'], 
-    default='or-tools'
+    default='gurobi'
 )
 
 # parser.add_argument('--model',
@@ -136,10 +137,39 @@ parser.add_argument(
     help='Optimality gap parameter for the solver, interger value: 1e-{solution_precision}'
 )
 
+parser.add_argument(
+    '--no_vcf',
+    action='store_true',
+    help='Do not write VCF files for novel variants'
+)
+
+parser.add_argument(
+    '--no_read_assignment',
+    action='store_true',
+    help='Do not write read assignment files'
+)
+
+parser.add_argument(
+    '--multi_band_solutions',
+    action='store_true',
+    help='Calculate and write multi band solutions'
+)
+
+
 
 def main():
     args = parser.parse_args()    
-    run_immunotyper(args.bam_path, args.ref, args.gene_type, args.hg37, args.solver, args.output_dir, args.landmark_groups, args.landmarks_per_group, args.max_copy, args.stdev_coeff, args.seq_error_rate, args.write_cache_path, args.solver_time_limit, args.threads, args.save_extracted_reads)
+
+    if '--solver' not in sys.argv:
+        if args.gene_type.startswith('ig'):
+            args.solver = 'gurobi'
+        elif args.gene_type.startswith('tr'):
+            args.solver = 'or-tools'
+    
+    # Log which solver is being used
+    log.info(f"Using {args.solver} solver for {args.gene_type} gene type")
+
+    run_immunotyper(args.bam_path, args.ref, args.gene_type, args.hg37, args.solver, args.output_dir, args.landmark_groups, args.landmarks_per_group, args.max_copy, args.stdev_coeff, args.seq_error_rate, args.write_cache_path, args.solver_time_limit, args.threads, args.save_extracted_reads, args.solution_precision, args.no_vcf, args.no_read_assignment, args.multi_band_solutions)
 
 
 def run_immunotyper(bam_path: str,  ref: str='',
@@ -156,7 +186,12 @@ def run_immunotyper(bam_path: str,  ref: str='',
                                     solver_time_limit: int=1,
                                     threads: int=6,
                                     save_extracted_reads: bool=False,
+                                    solution_precision: int=None,
+                                    no_vcf: bool=False,
+                                    no_read_assignment: bool=False,
+                                    multi_band_solutions: bool=False):
                                     solution_precision: int=None):
+        
     """Driver method to run immunotyper and output calls
 
     Args:
@@ -235,7 +270,8 @@ def run_immunotyper(bam_path: str,  ref: str='',
 
     model.build(positive, candidates)
     if solution_precision:
-        model.SOLUTION_PRECISION = solution_precision
+        model.SOLUTION_PRECISION = float(f"1e-{solution_precision}")
+
     model.solve(time_limit=solver_time_limit*3600, threads=threads, log_path=os.path.join(output_dir, f'{output_prefix}-{gene_type}-{solver}.log'))
 
 
@@ -251,28 +287,41 @@ def run_immunotyper(bam_path: str,  ref: str='',
     output_file = os.path.join(output_dir, os.path.splitext(os.path.basename(bam_path))[0]+f'-{gene_type.upper()}_allele_calls.txt')
     log.info(f"Writing all allele calls to: {output_file}")
     model.write_allele_calls(output_file, functional_only=False)
-            
-    # Call SNVs
-    post_processor = PostProcessorModel(model, allele_db, sequencing_depth=READ_DEPTH)
 
-    # Ensure the output VCF directory exists
-    output_vcf_dir = os.path.join(output_dir, os.path.splitext(os.path.basename(bam_path))[0]+'-novel_variant_vcfs')
-    os.makedirs(output_vcf_dir, exist_ok=True)
+    if solver == 'gurobi':
+        # Analyze multiple optimal solutions
+        log.info("Analyzing multiple optimal solutions")
+        multi_solution_analysis = MultiSolutionAnalysis(model)
+        multi_solution_analysis.write_multiple_solutions_alleles(output_dir, os.path.splitext(os.path.basename(bam_path))[0]+f'-{gene_type.upper()}')
 
-    output_path = os.path.join(output_dir, os.path.splitext(os.path.basename(bam_path))[0]+'-novel-variants.tsv')
-    log.info(f'Writing novel variants to: {output_path}')
-    
-    post_processor.write_all_variants(
-        output_path=output_path,
-        output_vcf_dir=output_vcf_dir
-    )
+        if multi_band_solutions:
+            log.info("Writing multi band solutions")
+            multi_solution_analysis.solve_multi_solution_bands()
+            multi_solution_analysis.write_all_solutions(output_dir, os.path.splitext(os.path.basename(bam_path))[0]+f'-{gene_type.upper()}')
 
-    # Write read assignments
-    output_dir = os.path.join(output_dir, os.path.splitext(os.path.basename(bam_path))[0]+'-read_assignment')
-    log.info(f'Writing read assignments to: {output_dir}')
-    post_processor.write_read_assignments(
-        output_dir=output_dir
-    )
+    if not no_vcf:
+        # Call SNVs
+        post_processor = PostProcessorModel(model, allele_db, sequencing_depth=READ_DEPTH)
+
+        # Ensure the output VCF directory exists
+        output_vcf_dir = os.path.join(output_dir, os.path.splitext(os.path.basename(bam_path))[0]+'-novel_variant_vcfs')
+        os.makedirs(output_vcf_dir, exist_ok=True)
+
+        output_path = os.path.join(output_dir, os.path.splitext(os.path.basename(bam_path))[0]+'-novel-variants.tsv')
+        log.info(f'Writing novel variants to: {output_path}')
+        
+        post_processor.write_all_variants(
+            output_path=output_path,
+            output_vcf_dir=output_vcf_dir
+        )
+
+    if not no_read_assignment:
+        # Write read assignments
+        output_dir = os.path.join(output_dir, os.path.splitext(os.path.basename(bam_path))[0]+'-read_assignment')
+        log.info(f'Writing read assignments to: {output_dir}')
+        post_processor.write_read_assignments(
+            output_dir=output_dir
+        )
 
 if __name__ == '__main__':
 	main() 
