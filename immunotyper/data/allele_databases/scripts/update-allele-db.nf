@@ -2,7 +2,7 @@ nextflow.enable.dsl=2
 
 params.gene_type = 'IGHV'
 params.novel_orphon_fasta = "$projectDir/NO_FILE"  // Default to NO_FILE
-params.outdir = '../'  // Default to parent directory when running from scripts/
+params.outdir = '../IGHV'
 params.script_dir = "${workflow.projectDir}"
 params.get_imgt_script = "${params.script_dir}/get_imgt_allele_database.sh"
 params.remove_duplicates_script = "${params.script_dir}/remove_duplicate_sequences.py"
@@ -22,7 +22,7 @@ process GET_IMGT_DB {
     path "${gene_type}-IMGT-allele-db.fa", emit: imgt_db
 
     script:
-    def novel_orphon_arg = novel_orphon_fasta.name != 'NO_FILE' ? "--novel_orphon_fasta ${novel_orphon_fasta}" : ''
+    def novel_orphon_arg = novel_orphon_fasta.name != 'NO_FILE' ? "--novel-orphon-fasta ${novel_orphon_fasta}" : ''
     """
     ${params.get_imgt_script} --gene-type ${gene_type} ${novel_orphon_arg} > ${gene_type}-IMGT-allele-db.fa
     """

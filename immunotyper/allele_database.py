@@ -225,7 +225,7 @@ class AlleleDatabase(ABC, Iterator):
                     continue
                     
                 if line.strip().startswith('Existing:') or line.strip().startswith('Current:'):
-                    allele_id = line.split('|')[1].strip()
+                    allele_id = line.split('|')[1].strip() if 'Novel' not in line else line.strip()[1:]
                     
                     if line.strip().startswith('Existing:'):
                         current_primary = allele_id
@@ -431,11 +431,11 @@ class ImgtNovelAlleleDatabase(AlleleDatabase):
             self.flanking_data = None
 
         super().__init__(*args, **kwargs)
-    
+
     def make_allele_instance(self, description, seq, consensus, gap_delimiter):
         if 'Homo_sapiens' in description: # allele is IMGT
             return ImgtAlleleReference(description, seq, consensus, gap_delimiter, self.flanking_data)
-        elif 'Novel' in description:   # is oscar novel allele
+        elif '|' not in description:   # is novel allele
             return OscarNovelAlleleReference(description, seq, consensus, gap_delimiter)
         else:
             raise NotImplementedError(f"Allele type for {description} not implemented")

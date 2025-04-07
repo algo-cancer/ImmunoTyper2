@@ -11,11 +11,7 @@ Found duplicate sequence:
   Current:  AC244456|IGHV(II)-30-51*01|Homo_sapiens|P|V-REGION|34304..34604|301 nt|1| | | | |301+0=301| |rev-compl|
   Keeping: AB019439|IGHV(II)-30-1*01|Homo_sapiens|P|V-REGION|90639..90939|301 nt|1| | | | |301+0=301| | | (first occurrence or equal/higher priority)
 Found duplicate sequence:
-  Existing: AC245166|IGHV(II)-30-1*02|Homo_sapiens|P|V-REGION|75277..75577|301 nt|1| | | | |301+0=301| | |
-  Current:  IMGT000128|IGHV(II)-30-51*03|Homo_sapiens|P|V-REGION|501811..502111|301 nt|1| | | | |301+0=301| | |
-  Keeping: AC245166|IGHV(II)-30-1*02|Homo_sapiens|P|V-REGION|75277..75577|301 nt|1| | | | |301+0=301| | | (first occurrence or equal/higher priority)
-Found duplicate sequence:
-  Existing: IMGT000128|IGHV(II)-43-1*03|Homo_sapiens|P|V-REGION|371780..371989|210 nt|1| | | | |210+0=210|partial in 5' and in 3' | |
+  Existing: BK068299|IGHV(II)-43-1*03|Homo_sapiens|P|V-REGION|371780..371989|210 nt|1| | | | |210+0=210|partial in 5' and in 3' | |
   Current:  AC233755|IGHV(II)-43-1D*01|Homo_sapiens|P|V-REGION|23722..23931|210 nt|1| | | | |210+0=210| | |
   Keeping: AC233755|IGHV(II)-43-1D*01|Homo_sapiens|P|V-REGION|23722..23931|210 nt|1| | | | |210+0=210| | | (higher priority)
 Found duplicate sequence:
@@ -83,10 +79,6 @@ Found duplicate sequence:
   Current:  AC245243|IGHV3-30-5*02|Homo_sapiens|F|V-REGION|3298..3593|296 nt|1| | | | |296+0=296| |rev-compl|
   Keeping: L26401|IGHV3-30*02|Homo_sapiens|F|V-REGION|104..399|296 nt|1| | | | |296+0=296| | | (first occurrence or equal/higher priority)
 Found duplicate sequence:
-  Existing: IMGT000128|IGHV3-30-42*02|Homo_sapiens|P|V-REGION|513058..513355|298 nt|1| | | | |298+0=298| | |
-  Current:  AB019439|IGHV3-32*01|Homo_sapiens|P|V-REGION|77173..77470|298 nt|1| | | | |298+0=298| | |
-  Keeping: AB019439|IGHV3-32*01|Homo_sapiens|P|V-REGION|77173..77470|298 nt|1| | | | |298+0=298| | | (higher priority)
-Found duplicate sequence:
   Existing: KC162924|IGHV3-30-22*01|Homo_sapiens|P|V-REGION|41477..41774|298 nt|1| | | | |298+0=298| |rev-compl|
   Current:  IMGT000177|IGHV3-32*02|Homo_sapiens|P|V-REGION|598769..599066|298 nt|1| | | | |298+0=298| | |
   Keeping: KC162924|IGHV3-30-22*01|Homo_sapiens|P|V-REGION|41477..41774|298 nt|1| | | | |298+0=298| |rev-compl| (first occurrence or equal/higher priority)
@@ -99,7 +91,19 @@ Found duplicate sequence:
   Current:  AC244456|IGHV4-30-4*01|Homo_sapiens|F|V-REGION|15905..16203|299 nt|1| | | | |299+0=299| | |
   Keeping: AC244456|IGHV4-30-4*01|Homo_sapiens|F|V-REGION|15905..16203|299 nt|1| | | | |299+0=299| | | (higher priority)
 Found duplicate sequence:
-  Existing: IMGT000128|IGHV4-30-4*09|Homo_sapiens|F|V-REGION|519918..520216|299 nt|1| | | | |299+0=299| | |
-  Current:  KC162925|IGHV4-31*03|Homo_sapiens|F|V-REGION|19675..19973|299 nt|1| | | | |299+0=299| | |
-  Keeping: IMGT000128|IGHV4-30-4*09|Homo_sapiens|F|V-REGION|519918..520216|299 nt|1| | | | |299+0=299| | | (first occurrence or equal/higher priority)
+  Existing: IGHV1-14*Novel-or16-0
+  Current:  IGHV1-14*Novel-or16-2
+  Keeping: IGHV1-14*Novel-or16-0 (first occurrence or equal/higher priority)
+Found duplicate sequence:
+  Existing: IGHV(III)-11-1*Novel-or16-0
+  Current:  IGHV(III)-11-1*Novel-or16-1
+  Keeping: IGHV(III)-11-1*Novel-or16-0 (first occurrence or equal/higher priority)
+Found duplicate sequence:
+  Existing: IGHV1-14*Novel-or16-0
+  Current:  IGHV1-14*Novel-or16-3
+  Keeping: IGHV1-14*Novel-or16-0 (first occurrence or equal/higher priority)
+Found duplicate sequence:
+  Existing: IGHV1-14*Novel-or16-1
+  Current:  IGHV1-14*Novel-or16-4
+  Keeping: IGHV1-14*Novel-or16-1 (first occurrence or equal/higher priority)
 Saving output to IGHV-IMGT-allele-db-no_duplicates.fa

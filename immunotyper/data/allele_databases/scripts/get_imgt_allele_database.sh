@@ -47,7 +47,7 @@ wget -qO - "https://www.imgt.org/download/GENE-DB/IMGTGENEDB-ReferenceSequences.
 
 # If novel orphon fasta is provided, append its contents
 if [ ! -z "$NOVEL_ORPHON_FASTA" ]; then
-    if [ -f "$NOVEL_ORPHON_FASTA" ]; then
+    if [ -r "$NOVEL_ORPHON_FASTA" ]; then
         cat "$NOVEL_ORPHON_FASTA"
     else
         echo "Error: Novel orphon FASTA file not found: $NOVEL_ORPHON_FASTA" >&2
