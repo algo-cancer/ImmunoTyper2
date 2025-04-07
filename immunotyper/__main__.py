@@ -190,7 +190,6 @@ def run_immunotyper(bam_path: str,  ref: str='',
                                     no_vcf: bool=False,
                                     no_read_assignment: bool=False,
                                     multi_band_solutions: bool=False):
-                                    solution_precision: int=None):
         
     """Driver method to run immunotyper and output calls
 
