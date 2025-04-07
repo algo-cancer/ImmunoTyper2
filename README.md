@@ -3,7 +3,7 @@
 **ImmunoTyper2** is a powerful tool for Immunoglobulin Variable Gene genotyping and CNV analysis from whole genome sequencing (WGS) short reads using ILP Optimization. Check out our [paper here](https://www.cell.com/cell-systems/fulltext/S2405-4712(22)00352-0?_returnURL=https%3A%2F%2Flinkinghub.elsevier.com%2Fretrieve%2Fpii%2FS2405471222003520%3Fshowall%3Dtrue) for more details.
 
 📢 **New Feature:** 
-- Default ILP solver is now the free-to-use [Google OR Tools](https://developers.google.com/optimization) with the CP SAT solver! 🎉
+- New optional ILP solver! The free-to-use [Google OR Tools](https://developers.google.com/optimization) with the CP SAT solver can be used with the `--solver or-tools` param ! 🎉 Note it is best suited to lower coverage or less complex loci (e.g. does not work on 30x IGHV).
 - Now supporting V gene calling for **all IG and TR loci!** (IGH, IGL, IGK, TRA, TRB, TRG, TRD) 
 - **Novel Variant Calling**: Identify novel variants for all gene calls using FreeBayes and WhatsHap. Variants are listed in `<prefix>-<gene_type>-novel-variants.txt` and phased VCFs are available in `<prefix>-<gene_type>-novel_variant_vcfs/<gene_id>_variants.vcf`.
 
@@ -25,13 +25,6 @@ You can also run the image with Docker, however **this method has not been teste
 ```sh
 docker pull cdslsahinalp/immunotyper-sr
 docker run -v <BAM_DIRECTORY>:<BAM_DIRECTORY> -v <OUTPUT_PATH>:/output immunotyper-sr <OPTIONAL ARGUMENTS> <BAM_DIRECTORY>/<BAM_FILE> 
-```
-
-You can also run the image with Docker, however **this method has not been tested**:
-
-```sh
-docker pull cdslsahinalp/immunotyper-sr
-docker run -v <GUROBI_LICENSE_PATH>:/opt/gurobi/gurobi.lic -v <BAM_DIRECTORY>:<BAM_DIRECTORY> -v <OUTPUT_PATH>:/output immunotyper-sr <OPTIONAL ARGUMENTS> <BAM_DIRECTORY>/<BAM_FILE> 
 ```
 
 ### Conda + Pip
@@ -74,7 +67,7 @@ conda activate immunotyper-SR
 pip install <binary.whl>
 ```
 
-2.  [Gurobi](https://www.gurobi.com/) solver configured with a valid license
+2.  [Gurobi](https://www.gurobi.com/) solver configured with a valid license. Note OR-Tools is also available as an alternative ILP solver, and is configured as the default solver for TCR loci. You can get a free academic license for Gurobi [here](https://www.gurobi.com/academia/academic-program-and-licenses/). 
 
 To check that gurobi is correctly configured, run `gurobi_cl` from a shell.
 
