@@ -287,20 +287,9 @@ def run_immunotyper(bam_path: str,  ref: str='',
     log.info(f"Writing all allele calls to: {output_file}")
     model.write_allele_calls(output_file, functional_only=False)
 
-    if solver == 'gurobi':
-        # Analyze multiple optimal solutions
-        log.info("Analyzing multiple optimal solutions")
-        multi_solution_analysis = MultiSolutionAnalysis(model)
-        multi_solution_analysis.write_multiple_solutions_alleles(output_dir, os.path.splitext(os.path.basename(bam_path))[0]+f'-{gene_type.upper()}')
-
-        if multi_band_solutions:
-            log.info("Writing multi band solutions")
-            multi_solution_analysis.solve_multi_solution_bands()
-            multi_solution_analysis.write_all_solutions(output_dir, os.path.splitext(os.path.basename(bam_path))[0]+f'-{gene_type.upper()}')
-
+    # Call SNVs
+    post_processor = PostProcessorModel(model, allele_db, sequencing_depth=READ_DEPTH)
     if not no_vcf:
-        # Call SNVs
-        post_processor = PostProcessorModel(model, allele_db, sequencing_depth=READ_DEPTH)
 
         # Ensure the output VCF directory exists
         output_vcf_dir = os.path.join(output_dir, os.path.splitext(os.path.basename(bam_path))[0]+'-novel_variant_vcfs')
@@ -321,6 +310,18 @@ def run_immunotyper(bam_path: str,  ref: str='',
         post_processor.write_read_assignments(
             output_dir=output_dir
         )
+        
+    if solver == 'gurobi':
+        # Analyze multiple optimal solutions
+        log.info("Analyzing multiple optimal solutions")
+        multi_solution_analysis = MultiSolutionAnalysis(model)
+        multi_solution_analysis.write_multiple_solutions_alleles(output_dir, os.path.splitext(os.path.basename(bam_path))[0]+f'-{gene_type.upper()}')
+
+        if multi_band_solutions:
+            log.info("Writing multi band solutions")
+            multi_solution_analysis.solve_multi_solution_bands()
+            multi_solution_analysis.write_all_solutions(output_dir, os.path.splitext(os.path.basename(bam_path))[0]+f'-{gene_type.upper()}')
+
 
 if __name__ == '__main__':
 	main() 
