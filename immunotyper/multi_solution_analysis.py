@@ -1,16 +1,22 @@
 import os
 from .models import ModelMeta
 from gurobipy import Model as GurobiSolver
-from .common import log
+from .common import log, resource_path
 from collections import defaultdict
 from typing import List, Dict, Tuple, Optional, Union, Any
 import yaml
 import json
 
+class PrefixConsistencyError(Exception):
+    """Custom exception for errors during prefix consistency calculation,
+       typically due to missing prerequisite data like band solutions.
+    """
+    pass
+
 
 class MultiSolutionAnalysis(object):
 
-    def __init__(self, model: ModelMeta):
+    def __init__(self, model: ModelMeta, gene_type: str, allele_db):
         """
         Initialize the MultiSolutionAnalysis object for finding multiple solutions
         in bands relative to the optimal objective function value.
@@ -25,6 +31,8 @@ class MultiSolutionAnalysis(object):
             raise ValueError("MultiSolutionAnalysis only supports GurobiSolver models")
         
         self.model = model
+        self.gene_type = gene_type
+        self.allele_db = allele_db
         self.gurobi_model = model.model
         self.allele_calls = model.get_allele_calls()
         self.functional_allele_calls = model.get_allele_calls(functional_only=True)
@@ -451,3 +459,276 @@ class MultiSolutionAnalysis(object):
         output_file = os.path.join(solution_dir, "near_optimal_solutions.json")
         self.write_solution_info(output_file, self.near_optimal_solutions)
 
+    def calculate_prefix_consistency_for_optimal_alleles(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Calculates the prefix consistency value for each allele call from the optimal solution.
+
+        The prefix consistency score for an allele is defined as the number of consecutive
+        bands immediately following the optimal solution where the allele's copy number
+        remains identical to its copy number in the optimal solution.
+
+        Raises:
+            PrefixConsistencyError: If prerequisite data (optimal solution or multi-band solutions)
+                                    is missing or invalid.
+
+        Returns:
+            Dict[str, Dict[str, Any]]: A dictionary where keys are allele IDs from the
+            optimal solution. Values are dictionaries containing:
+                'in_optimal': True
+                'optimal_copies': Copy number in the optimal solution.
+                'is_functional': Boolean indicating functionality.
+                'prefix_consistency': The calculated prefix consistency score.
+                'objective_diff_at_consistency_break': Percent objective difference from optimal
+                                                       for the last band that maintained consistency.
+                                                       None if prefix_consistency is 0.
+                'band0_copies': Copy number in the optimal solution ("Consistency Band 0").
+                'band1_copies' through 'band5_copies': Copy numbers in "Consistency Bands 1-5".
+                                                        (0 if band not solved or allele absent).
+        """
+        # Step A: Prerequisites and Initialization
+        if not hasattr(self, 'optimal_solution') or \
+           not self.optimal_solution or \
+           'allele_vars' not in self.optimal_solution:
+            raise PrefixConsistencyError("Optimal solution data is not available or is invalid.")
+
+        if not hasattr(self, 'multi_band_solutions') or self.multi_band_solutions is None:
+            # Allow self.multi_band_solutions to be an empty list
+            # If it's None, it means solve_multi_solution_bands was likely not called.
+            raise PrefixConsistencyError(
+                "Multi-band solutions attribute (`self.multi_band_solutions`) is None. "
+                "Ensure solve_multi_solution_bands() has been run."
+            )
+
+        num_inferred_bands = len(self.multi_band_solutions)
+        # Using a global 'log' or 'self.model.log' if available for warnings
+        # For this standalone function, I'll assume a 'log' object exists (e.g., from 'from .common import log')
+        # If using a class-specific or instance-specific logger:
+        # logger = getattr(self.model, 'log', logging.getLogger(__name__)) # Example
+        if num_inferred_bands == 0:
+            # This situation is handled by the logic below; prefix_consistency will be 0.
+            # log.warning( # Replace with actual logging mechanism
+            print(
+                "Warning: No solutions found in `multi_band_solutions`. "
+                "Prefix consistency scores will be 0 for all alleles "
+                "(indicating no consistency beyond the optimal solution itself)."
+            )
+
+
+        # Step B: Prepare Band Data Structure
+        bands_data: Dict[int, Dict[str, Any]] = {}
+
+        # "Consistency Band 0" (Data from Optimal Solution)
+        bands_data[0] = {
+            'alleles': self.optimal_solution['allele_vars'],
+            'obj_diff': 0.0
+        }
+
+        # "Consistency Band 1" through "Consistency Band num_inferred_bands"
+        for idx in range(num_inferred_bands):
+            # Assuming self.multi_band_solutions[idx] is the solution for the idx-th band interval
+            # (i.e., solution['band'] in the original creation was idx)
+            current_band_solution = self.multi_band_solutions[idx]
+            consistency_band_index = idx + 1
+            bands_data[consistency_band_index] = {
+                'alleles': current_band_solution.get('allele_vars', {}),
+                'obj_diff': current_band_solution.get('percent_from_optimal', float('inf'))
+            }
+
+        # Step C & D: Calculate Metrics for Alleles in Optimal Solution
+        prefix_consistency_results: Dict[str, Dict[str, Any]] = {}
+
+        for allele_id, optimal_copy_number in self.optimal_solution['allele_vars'].items():
+            if optimal_copy_number == 0:  # Should not happen if allele_vars is sparse
+                continue
+
+            metrics: Dict[str, Any] = {}
+            metrics['in_optimal'] = True
+            metrics['optimal_copies'] = optimal_copy_number
+            
+            if hasattr(self, 'allele_db') and allele_id in self.allele_db and \
+               hasattr(self.allele_db[allele_id], 'is_functional'):
+                metrics['is_functional'] = self.allele_db[allele_id].is_functional
+            else:
+                # Fallback or error if allele_db structure is not as expected
+                # log.warning(f"Could not determine functionality for allele {allele_id} from self.allele_db")
+                print(f"Warning: Could not determine functionality for allele {allele_id} from self.allele_db")
+                metrics['is_functional'] = False # Default if lookup fails
+
+            metrics['band0_copies'] = optimal_copy_number
+
+            # Calculate prefix_consistency score
+            current_prefix_consistency_score = 0
+            if optimal_copy_number > 0:
+                for j in range(1, num_inferred_bands + 1): # Iterate through Consistency Bands 1, 2, ...
+                    cn_band_j = bands_data.get(j, {}).get('alleles', {}).get(allele_id, 0)
+                    if cn_band_j == optimal_copy_number:
+                        current_prefix_consistency_score += 1
+                    else:
+                        break  # Consistency with optimal_copy_number broken
+            metrics['prefix_consistency'] = current_prefix_consistency_score
+
+            # Determine objective_diff_at_consistency_break
+            if metrics['prefix_consistency'] > 0:
+                # The objective difference of the last band (j = metrics['prefix_consistency'])
+                # that maintained consistency with the optimal solution.
+                metrics['objective_diff_at_consistency_break'] = \
+                    bands_data.get(metrics['prefix_consistency'], {}).get('obj_diff', None)
+            else:
+                metrics['objective_diff_at_consistency_break'] = None
+
+            # Record copy numbers for a fixed set of bands (e.g., up to 5 beyond optimal)
+            # This ensures a consistent structure in the output.
+            max_bands_to_report = 5 # Report copy numbers for Consistency Bands 1 through 5
+            for k in range(1, max_bands_to_report + 1):
+                if k <= num_inferred_bands:
+                    metrics[f'band{k}_copies'] = \
+                        bands_data.get(k, {}).get('alleles', {}).get(allele_id, 0)
+                else:
+                    # This reporting band k is beyond the bands actually solved for/inferred
+                    metrics[f'band{k}_copies'] = 0
+            
+            prefix_consistency_results[allele_id] = metrics
+
+        return prefix_consistency_results
+
+
+    def format_prefix_consistency_tsv(
+        self,
+        output_file_path: Optional[str] = None
+    ) -> Optional[str]:
+        """
+        Formats the prefix consistency results for optimal alleles into a TSV string,
+        integrating confidence metrics from an external JSON file.
+
+        Args:
+            confidence_metrics_file_path (str): The direct file system path to the
+                                                confidence metrics JSON file.
+            output_file_path (Optional[str]): If provided, the TSV output will be
+                                              written to this file path. If None,
+                                              the TSV string is returned.
+
+        Returns:
+            Optional[str]: A string formatted as a Tab-Separated Value (TSV) table
+                           if output_file_path is None, otherwise None.
+
+        Raises:
+            FileNotFoundError: If the confidence_metrics_file_path does not exist.
+            json.JSONDecodeError: If the confidence metrics file is not valid JSON.
+            PrefixConsistencyError: If calculate_prefix_consistency_for_optimal_alleles()
+                                    raises it due to its own prerequisites not being met.
+            AttributeError: If self.gene_type is not set on the instance.
+        """
+        # 1. Resolve Path and Load External Confidence Metrics
+        
+        json_path = resource_path("confidence_metric/gene_prefix_consistency_metrics.json")
+        
+        try:
+            with open(json_path, 'r') as f:
+                confidence_data = json.load(f)
+        except FileNotFoundError:
+            log.error(
+                f"Confidence metrics file not found at path: {json_path}"
+            )
+            return None
+        except json.JSONDecodeError as e:
+            log.error(
+                f"Error decoding JSON from {json_path}: {e.msg} (Line: {e.lineno}, Col: {e.colno})"
+            )
+            return None
+
+        # 2. Get Allele Prefix Consistency Data
+        # This call might raise PrefixConsistencyError, which will propagate as per design.
+        try:
+            allele_consistency_data = self.calculate_prefix_consistency_for_optimal_alleles()
+        except PrefixConsistencyError as e: # Explicitly catch to re-raise if needed, or handle
+            log.error(f"Failed to calculate prefix consistency: {e}")
+            raise # Re-raise if this error should halt execution further up.
+                  # Or return None if this specific error should also be handled by returning None.
+                  # For now, re-raising as it's a different category of error.
+
+
+        # 3. Prepare for TSV Output (Store as list of dicts for sorting)
+        processed_data_for_tsv: List[Dict[str, Any]] = []
+
+        # 4. Iterate and Process Each Allele
+        for allele_id, metrics_dict in allele_consistency_data.items():
+            # a. Extract Basic Info
+            functional_status_str = "Functional" if metrics_dict.get('is_functional', False) else "Non-functional"
+            consistency_value = metrics_dict.get('prefix_consistency', 0)
+
+            # b. Get gene_type (from instance) and base_gene_name
+            if not hasattr(self, 'gene_type') or not self.gene_type:
+                log.error("Instance attribute 'self.gene_type' is not set. Please ensure it's initialized.")
+                return None # Or handle per allele: for now, fail the whole process
+            current_gene_type = self.gene_type
+            base_gene_name = allele_id.split('*')[0]
+
+            # c. Initialize Derived Metrics to Default "Data missing"
+            prob_tp_str = "Data missing"
+            passes_optimal_str = "Data missing"
+            optimal_thresh_accuracy_str = "Data missing"
+
+            # d. Fetch Data from confidence_data
+            gene_data_from_json = confidence_data.get("gene_types", {})\
+                                               .get(current_gene_type, {})\
+                                               .get("genes", {})\
+                                               .get(base_gene_name, None)
+
+            if gene_data_from_json:
+                threshold_metrics_for_gene = gene_data_from_json.get("prefix_consistency_threshold_metrics", {})
+
+                prob_tp_data_entry = threshold_metrics_for_gene.get(str(consistency_value), {})
+                prob_tp_value = prob_tp_data_entry.get("precision", None)
+                if prob_tp_value is not None:
+                    prob_tp_str = f"{prob_tp_value:.2f}"
+
+                optimal_threshold_val_from_json = gene_data_from_json.get("optimal_threshold", None)
+                if optimal_threshold_val_from_json is not None:
+                    passes = consistency_value >= optimal_threshold_val_from_json
+                    passes_optimal_str = "True" if passes else "False"
+
+                    optimal_thresh_key_str = str(optimal_threshold_val_from_json)
+                    optimal_accuracy_data_entry = threshold_metrics_for_gene.get(optimal_thresh_key_str, {})
+                    optimal_gene_accuracy_value = optimal_accuracy_data_entry.get("precision", None)
+                    if optimal_gene_accuracy_value is not None:
+                        optimal_thresh_accuracy_str = f"{optimal_gene_accuracy_value:.2f}"
+            
+            processed_data_for_tsv.append({
+                "Allele": allele_id,
+                "Functional status": functional_status_str,
+                "Consistency value": consistency_value,
+                "Probability of TP": prob_tp_str,
+                "Passes Optimal Threshold": passes_optimal_str,
+                "Optimal Threshold Gene Accuracy": optimal_thresh_accuracy_str
+            })
+
+        sorted_data_for_tsv = sorted(processed_data_for_tsv, key=lambda x: x["Allele"])
+
+        header_columns = ["Allele", "Functional status", "Consistency value",
+                          "Probability of TP", "Passes Optimal Threshold",
+                          "Optimal Threshold Gene Accuracy"]
+        tsv_rows: List[str] = ["\t".join(header_columns)]
+
+        for row_dict in sorted_data_for_tsv:
+            row_values = [
+                str(row_dict["Allele"]),
+                str(row_dict["Functional status"]),
+                str(row_dict["Consistency value"]),
+                str(row_dict["Probability of TP"]),
+                str(row_dict["Passes Optimal Threshold"]),
+                str(row_dict["Optimal Threshold Gene Accuracy"])
+            ]
+            tsv_rows.append("\t".join(row_values))
+
+        tsv_string = "\n".join(tsv_rows)
+
+        if output_file_path:
+            try:
+                with open(output_file_path, 'w') as f_out:
+                    f_out.write(tsv_string)
+                return None
+            except IOError as e:
+                log.error(f"Error writing TSV to file {output_file_path}: {e}")
+                return None # Return None if file writing fails
+        else:
+            return tsv_string

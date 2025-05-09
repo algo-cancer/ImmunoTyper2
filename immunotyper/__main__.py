@@ -150,9 +150,9 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    '--multi_band_solutions',
+    '--no_confidence_metric',
     action='store_true',
-    help='Calculate and write multi band solutions'
+    help='Do not compute multi band solutions and write confidence metric'
 )
 
 
@@ -169,7 +169,7 @@ def main():
     # Log which solver is being used
     log.info(f"Using {args.solver} solver for {args.gene_type} gene type")
 
-    run_immunotyper(args.bam_path, args.ref, args.gene_type, args.hg37, args.solver, args.output_dir, args.landmark_groups, args.landmarks_per_group, args.max_copy, args.stdev_coeff, args.seq_error_rate, args.write_cache_path, args.solver_time_limit, args.threads, args.save_extracted_reads, args.solution_precision, args.no_vcf, args.no_read_assignment, args.multi_band_solutions)
+    run_immunotyper(args.bam_path, args.ref, args.gene_type, args.hg37, args.solver, args.output_dir, args.landmark_groups, args.landmarks_per_group, args.max_copy, args.stdev_coeff, args.seq_error_rate, args.write_cache_path, args.solver_time_limit, args.threads, args.save_extracted_reads, args.solution_precision, args.no_vcf, args.no_read_assignment, args.no_confidence_metric)
 
 
 def run_immunotyper(bam_path: str,  ref: str='',
@@ -189,7 +189,7 @@ def run_immunotyper(bam_path: str,  ref: str='',
                                     solution_precision: int=None,
                                     no_vcf: bool=False,
                                     no_read_assignment: bool=False,
-                                    multi_band_solutions: bool=False):
+                                    no_confidence_metric: bool=False):
         
     """Driver method to run immunotyper and output calls
 
@@ -314,13 +314,14 @@ def run_immunotyper(bam_path: str,  ref: str='',
     if solver == 'gurobi':
         # Analyze multiple optimal solutions
         log.info("Analyzing multiple optimal solutions")
-        multi_solution_analysis = MultiSolutionAnalysis(model)
-        multi_solution_analysis.write_multiple_solutions_alleles(output_dir, os.path.splitext(os.path.basename(bam_path))[0]+f'-{gene_type.upper()}')
+        multi_solution_analysis = MultiSolutionAnalysis(model, gene_type=gene_type.upper(), allele_db=allele_db)
+        multi_solution_analysis.write_multiple_solutions_alleles("./", os.path.splitext(os.path.basename(bam_path))[0]+f'-{gene_type.upper()}')
 
-        if multi_band_solutions:
+        if not no_confidence_metric:
             log.info("Writing multi band solutions")
             multi_solution_analysis.solve_multi_solution_bands()
-            multi_solution_analysis.write_all_solutions(output_dir, os.path.splitext(os.path.basename(bam_path))[0]+f'-{gene_type.upper()}')
+            multi_solution_analysis.write_all_solutions("./", os.path.splitext(os.path.basename(bam_path))[0]+f'-{gene_type.upper()}')
+            multi_solution_analysis.format_prefix_consistency_tsv(os.path.join("./", os.path.splitext(os.path.basename(bam_path))[0]+f'-{gene_type.upper()}-solutions-with-consistency-confidence.tsv'))
 
 
 if __name__ == '__main__':
